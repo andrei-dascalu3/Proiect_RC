@@ -13,6 +13,10 @@
 #include <sys/file.h>
 #include <stdlib.h>
 #include <time.h>
+#include <chrono>
+#include <libxml2/libxml/parser.h>
+#include <libxml2/libxml/tree.h>
+#include <libxml/xmlmemory.h>
 
 #define PORT 2800
 #define DIMBUF 1024
@@ -34,14 +38,16 @@ Thread *threadsPool;
 int sd, nthreads, problemCode, problemTime = 60;
 pthread_mutex_t mlock=PTHREAD_MUTEX_INITIALIZER;
 
+chrono::high_resolution_clock::time_point startTime;
+
 void configure();
 void threadCreate(int i);
 void *treat(void * arg);
 void login(int clientSock);
 int chooseProblem(int nrProblems);
 void sendProblem(int clientSock);
-void receiveSource(int clientSock);
-void evaluateSource(int clientSock);
+void receiveSource(int clientSock, char* sourceName);
+void evaluateSource(int clientSock, char* sourceName, char* execName);
 void itoa(char number[10], int N)
 {
     bzero(number, 0);
@@ -168,6 +174,7 @@ void configure()
             }
         }
     }
+    startTime = chrono::high_resolution_clock::now();
 }
 void threadCreate(int i)
 {
@@ -178,6 +185,7 @@ void threadCreate(int i)
 void *treat(void * arg)
 {
     int client, tag;
+    char sourceName[DIMBUF], execName[DIMBUF];
     struct sockaddr_in from;
     bzero (&from, sizeof (from));
     tag = *((int*) arg);
@@ -195,8 +203,8 @@ void *treat(void * arg)
 
         login(client);
         sendProblem(client);
-        receiveSource(client);
-        evaluateSource(client);
+        receiveSource(client, sourceName);
+        evaluateSource(client, sourceName, execName);
 
         close (client);
     }
@@ -233,11 +241,11 @@ void sendProblem(int clientSock)
     if(write(clientSock, statement, DIMBUF*2) <= 0)
         handle_error("[service] Eroare la trimiterea enuntului problemei.\n", errno);
 }
-void receiveSource(int clientSock)
+void receiveSource(int clientSock, char* sourceName)
 {
     printf("[server] Se accepta surse cu rezolvarea problemei.\n");
     int source_fd, readcode;
-    char sourceName[DIMBUF+1], buffer[DIMBUF];
+    char buffer[DIMBUF], *dot;
     sourceName[0] = '_';
     if(read(clientSock, sourceName + 1, DIMBUF) < 0)
         handle_error("[server] Eroare la citirea numelui fisierului sursa trimis.\n", errno);
@@ -250,8 +258,6 @@ void receiveSource(int clientSock)
         bzero(buffer, DIMBUF);
         if((readcode = read(clientSock, buffer, DIMBUF)) < 0)
             handle_error("[server] Eroare la citirea din socket.\n", errno);
-        printf("%s\n", buffer); fflush(stdout);
-        printf("%d", readcode); fflush(stdout);
         if(write(source_fd, buffer, DIMBUF) < 0)
             handle_error("[server] Eroare la scrierea in fisierul sursa.\n", errno);
         if(readcode <= DIMBUF)
@@ -262,11 +268,38 @@ void receiveSource(int clientSock)
     */
     close(source_fd);
 }
-void evaluateSource(int clientSock)
+void evaluateSource(int clientSock, char* sourceName, char* execName)
 {
+    pid_t child;
+    char *extension;
+
+    if(-1 == (child = fork()))
+        handle_error("[server] Eroare la compilarea sursei primite.\n", errno);
+///Compilarea sursei participantului
+    if(child == 0)
+    {
+        if((extension = strstr(sourceName, ".cpp")) != NULL)
+        {
+            *extension = '\0';
+            strcpy(execName, sourceName);
+            *extension = '.';
+            printf("[server] Fisier C++.\n");
+            if(-1 == execlp("g++", "g++", sourceName, "-o", execName, NULL))
+                handle_error("[server] Eroare la compilarea sursei primite.\n", errno);
+        }
+        else if((extension = strstr(sourceName, ".c")) != NULL)
+        {
+            *extension = '\0';
+            strcpy(execName, sourceName);
+            *extension = '.';
+            printf("[server] Fisier C.\n");
+            if(-1 == execlp("gcc", "gcc", sourceName, "-o", execName, NULL))
+                handle_error("[server] Eroare la compilarea sursei primite.\n", errno);
+        }
+    }
     printf("[server] Se evalueaza sursele primite si transmitem rezultatele.\n");
     if(write(clientSock, "Test 1 : 25 puncte\nTest 2 : 25 puncte\nTest 3 : 25 puncte\nTest 4 : 25 puncte\n\nTotal: 100 puncte\n", DIMBUF) < 0)
         handle_error("[server] Eroare la trimiterea rezultatelor.", errno);
-    printf("[server] Am transimis rezultatele.\n");
+    printf("[server] Am transmis rezultatele.\n");
     fflush(stdout);
 }

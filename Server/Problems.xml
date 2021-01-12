@@ -1,0 +1,102 @@
+<?xml version="1.0"?>
+<PROBLEMS>
+    <PROBLEM id="1">
+        <TITLE>Suma a 2 numere</TITLE>
+        <STATEMENT>
+        Fie a si b doua numere intregi citite din fisierul pb1.in. Afisati suma lor in fiserul pb1.out.
+        </STATEMENT>
+        <IN_NAME>pb1.in</IN_NAME>
+        <IN_EX>10 7</IN_EX>
+        <OUT_NAME>pb1.out</OUT_NAME>
+        <OUT_EX>17</OUT_EX>
+        <TIME>20</TIME>
+        <TESTS>
+            <TEST id="1">
+                <INPUT>10 20</INPUT>
+                <OUTPUT>30</OUTPUT>
+            </TEST>
+            <TEST id="2">
+                <INPUT>287 54662</INPUT>
+                <OUTPUT>54949</OUTPUT>
+            </TEST>
+            <TEST id="3">
+                <INPUT>1000002 740000</INPUT>
+                <OUTPUT>1740002</OUTPUT>
+            </TEST>
+            <TEST id="4">
+                <INPUT>9847421 212421</INPUT>
+                <OUTPUT>10059842</OUTPUT>
+            </TEST>
+            <TEST id="5">
+                <INPUT>1041345671 1010000014</INPUT>
+                <OUTPUT>2051345685</OUTPUT>
+            </TEST>
+        </TESTS>
+    </PROBLEM>
+    <PROBLEM id="2">
+        <TITLE>Produsul a 2 numere</TITLE>
+        <STATEMENT>
+        Fie a si b doua numere intregi citite din fisierul pb2.in. Afisati produsul lor in fiserul pb2.out.
+        </STATEMENT>
+        <IN_EX>pb2.in</IN_EX>
+        <INPUT>10 7</INPUT>
+        <OUT_NAME>pb2.out</OUT_NAME>
+        <OUT_EX>70</OUT_EX>
+        <TIME>20</TIME>
+        <TESTS>
+            <TEST id="1">
+                <INPUT>10 20</INPUT>
+                <OUTPUT>200</OUTPUT>
+            </TEST>
+            <TEST id="2">
+                <INPUT>23 43</INPUT>
+                <OUTPUT>989</OUTPUT>
+            </TEST>
+            <TEST id="3">
+                <INPUT>457 −9412</INPUT>
+                <OUTPUT>−4301284</OUTPUT>
+            </TEST>
+            <TEST id="4">
+                <INPUT>-26 -981</INPUT>
+                <OUTPUT>25506</OUTPUT>
+            </TEST>
+            <TEST id="5">
+                <INPUT>46340 46330</INPUT>
+                <OUTPUT>2146932200</OUTPUT>
+            </TEST>
+        </TESTS>
+    </PROBLEM>
+    <PROBLEM id="3">
+        <TITLE>Pozitia unui caracter intr-un sir</TITLE>
+        <STATEMENT>
+        Fie s un sir de caractere si c un caracter, delimitate de spatiu si citite din fisierul pb3.in. Afisati pozitia primei aparitii a caracteruli c in sirul s sinumarul de aparitii al lui c in sirul s, separate prin spatiu, in fisierul pb3.out. Daca acesta nu exista, afisati mesajul "Caracter negasit".
+        </STATEMENT>
+        <IN_EX>pb3.in</IN_EX>
+        <INPUT>mar a</INPUT>
+        <OUT_NAME>pb3.out</OUT_NAME>
+        <OUT_EX>1 1</OUT_EX>
+        <TIME>30</TIME>
+        <TESTS>
+            <TEST id="1">
+                <INPUT>hipopotam p</INPUT>
+                <OUTPUT>2 2</OUTPUT>
+            </TEST>
+            <TEST id="2">
+                <INPUT>Acesta_este_un_sir s</INPUT>
+                <OUTPUT>3 4</OUTPUT>
+            </TEST>
+            <TEST id="3">
+                <INPUT>TesTuL_AL_treiLea_al_problemei l</INPUT>
+                <OUTPUT>19 2</OUTPUT>
+            </TEST>
+            <TEST id="4">
+                <INPUT>qwertyuioplkjhgfdsazxcvbnm012345679_ABC 8</INPUT>
+                <OUTPUT>Caracter negasit</OUTPUT>
+            </TEST>
+            <TEST id="5">
+                <INPUT>qwertyuiopasdfghjklzxcvbnmPOIUYTREWQLKJHGFDSAMNBVCXZaaaaaaaaaaaAAambm a</INPUT>
+                <OUTPUT>10 13</OUTPUT>
+            </TEST>
+        </TESTS>
+    </PROBLEM>
+</PROBLEMS>
