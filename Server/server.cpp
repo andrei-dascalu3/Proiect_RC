@@ -35,14 +35,19 @@ typedef struct {
 
 Thread *threadsPool;
 
-int sd, nthreads, problemCode, problemTime = 60;
+int sd, nthreads, problemCode, problemTime = 60*60;
 pthread_mutex_t mlock=PTHREAD_MUTEX_INITIALIZER;
 
 chrono::high_resolution_clock::time_point startTime;
 
+void findUser(xmlNode* root, char* searched, bool& found);
+
 void configure();
 void threadCreate(int i);
 void *treat(void * arg);
+void getCommand(int clientSock, char* sourceName, char* execName);
+void sendTime(int clientSock);
+void sendHelp(int clientSock);
 void login(int clientSock);
 int chooseProblem(int nrProblems);
 void sendProblem(int clientSock);
@@ -165,7 +170,7 @@ void configure()
                         break;
                     }
                 if(i = strlen(value))
-                    problemTime = atoi(value);
+                    problemTime = atoi(value)*60;
             }
             else
             {
@@ -201,23 +206,93 @@ void *treat(void * arg)
         pthread_mutex_unlock(&mlock);
         threadsPool[tag].thCount++;
 
-        login(client);
-        sendProblem(client);
-        receiveSource(client, sourceName);
-        evaluateSource(client, sourceName, execName);
-
-        close (client);
+        getCommand(client, sourceName, execName);
     }
+}
+void getCommand(int clientSock, char* sourceName, char* execName) {
+    char command[25];
+    int readcode, help_fd;
+    while(1) {
+        if((readcode = read(clientSock, command, 25)) < 0)
+            handle_error("[server] Eroare la citirea comenzii de la participant.\n", errno);
+        if(strcmp(command, "login") == 0)
+            login(clientSock);
+        else if(strcmp(command, "get_problem") == 0)
+            sendProblem(clientSock);
+        else if(strcmp(command, "send_source") == 0)
+        {
+            receiveSource(clientSock, sourceName);
+            evaluateSource(clientSock, sourceName, execName);
+        }
+        else if(strcmp(command, "help") == 0)
+            sendHelp(clientSock);
+        else if(strcmp(command, "time") == 0)
+            sendTime(clientSock);
+        else if(strcmp(command, "exit") == 0)
+        {
+            close(clientSock);
+            return;
+        }
+    }
+
+}
+void sendTime(int clientSock)
+{
+    char message[16], minutes[3], seconds[3];
+    auto timeNow = std::chrono::high_resolution_clock::now();
+    chrono::duration<int> elapsed = chrono::duration_cast<chrono::seconds>(timeNow - startTime);
+    int remained = problemTime - int(elapsed.count());
+    itoa(minutes, remained/60); cout<<remained/60<<' '<<remained%60<<endl;
+    itoa(seconds, remained%60);
+    strcpy(message, minutes);
+    strcat(message, " : ");
+    strcat(message, seconds);
+    strcat(message, " s");
+    if(write(clientSock, message, 16) <= 0)
+        handle_error("[server] Eroare la trimiterea timpului catre participant.\n", errno);
+}
+void sendHelp(int clientSock)
+{
+    int help_fd;
+    char buffer[DIMBUF];
+    if((help_fd = open("Help.txt", O_RDONLY)) <= 0)
+        handle_error("[server] Eroare deschiderea fisierului Help.txt.\n", errno);
+    if(read(help_fd, buffer, DIMBUF) <= 0)
+        handle_error("[server] Eroare la citirea din fisierul Help.txt.\n", errno);
+    if(write(clientSock, buffer, DIMBUF) <= 0)
+        handle_error("[server] Eroare la trimiterea textului din Help.txt catre participant.\n", errno);
+    printf("[server] Am transmis informatii de ajutor ramas catre participant.\n");
+    fflush(stdout);
 }
 void login(int clientSock)
 {
+    xmlDoc *doc = NULL;
+    xmlNode *root_element = NULL;
+    bool found = false;
     char buffer[DIMBUF], msg[DIMBUF] = "V-ati logat cu username-ul: ";
+
+    doc = xmlReadFile("Participants.xml", NULL, 0);
+    if (doc == NULL)
+        handle_error("[server] Eroare la parsarea fisierului \'Participants.xml\'.\n", 1);
+    root_element = xmlDocGetRootElement(doc);
     if(read(clientSock, buffer, DIMBUF) <= 0)
         handle_error("[server] Eroare la citirea username-ului din socket.\n", errno);
-    printf("Utilizator %s logat.\n", buffer);
-    strcat(msg, buffer); strcat(msg, "\n");
-    if(write(clientSock, msg, strlen(msg)) <= 0)
-        handle_error("[server] Eroare la scrierea in socket.\n", errno);
+    findUser(root_element, buffer, found);
+    if(found)
+    {
+
+        printf("Utilizator %s logat.\n", buffer);
+        strcat(msg, buffer); strcat(msg, "\n");
+        if(write(clientSock, msg, strlen(msg)) <= 0)
+            handle_error("[server] Eroare la scrierea in socket.\n", errno);
+    }
+    else
+    {
+        printf("Utilizatorul %s nu exista.\n", buffer);
+        sprintf(msg, "Utilizatorul %s nu exista.\n", buffer);
+        if(write(clientSock, msg, strlen(msg)) <= 0)
+            handle_error("[server] Eroare la scrierea in socket.\n", errno);
+    }
 }
 int chooseProblem(int nrProblems)
 {
@@ -302,4 +377,24 @@ void evaluateSource(int clientSock, char* sourceName, char* execName)
         handle_error("[server] Eroare la trimiterea rezultatelor.", errno);
     printf("[server] Am transmis rezultatele.\n");
     fflush(stdout);
+}
+
+void findUser(xmlNode* root, char* searched, bool& found)
+{
+    xmlNode* cur_node = NULL;
+    char compared[DIMBUF];
+    for (cur_node = root; cur_node; cur_node = cur_node->next)
+    {
+        if (cur_node->type == XML_ELEMENT_NODE)
+        {
+            if(strcmp((const char*)cur_node->name, "USERNAME") == 0)
+            {
+                bzero(compared, DIMBUF);
+                strcpy(compared, (const char*)cur_node->children->content);
+                if(strcmp(searched, compared) == 0)
+                    found = true;
+            }
+        }
+        findUser(cur_node->children, searched, found);
+    }
 }

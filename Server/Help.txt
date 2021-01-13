@@ -1,0 +1,13 @@
+_____________________________________________
+Bun venit la Olimpiada de Informatica Online!
+_____________________________________________
+Comenzii disponibile:
+(*) = Comanda necesara
+
+->(*) login : Logare cu un username unic.
+-> get_problem : Primirea enuntului problemei de la server.
+-> send_source : Trimiterea unei rezolvari (fisier sursa) catre server.
+-> help : Comanda pe care ai apelat-o acum.
+-> time : Aflarea timpului ramas pentru rezolvare.
+-> exit : Iesirea din competitie.
+

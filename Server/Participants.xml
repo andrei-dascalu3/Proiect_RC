@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <USERS>
-    <USER>
+    <USER id = "1">
         <USERNAME>Andrei</USERNAME>
         <SCORE>0</SCORE>
         <UPLOADTIME>0</UPLOADTIME>

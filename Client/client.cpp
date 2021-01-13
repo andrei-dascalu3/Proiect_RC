@@ -21,11 +21,12 @@ extern int errno;
 int port;
 
 void getCommand(int sockd);
+void getTime(int sockd);
 int login(int sockd);
 int readProblem(int sockd);
 int sendSourceCode(int sockd);
 void receiveResults(int sockd);
-void getHelp(const char* helpFileName);
+void getHelp(int sockd);
 
 int main (int argc, char *argv[])
 {
@@ -57,9 +58,10 @@ int main (int argc, char *argv[])
 void getCommand(int sockd)
 {
     int has_logged = 0, has_read = 0, has_sent = 0;
-    char command[25];
+    char command[25], message[5];
     while(1)
     {
+        bzero(message, 5);
         printf("Dati o comanda : ");
         cin.getline(command, 25);
         if(strchr(command, ' ') != NULL)
@@ -69,6 +71,8 @@ void getCommand(int sockd)
         }
         else
         {
+            if(write(sockd, command, 25) < 0)
+                handle_error("[participant] Eroare la transmiterea comenzii catre server.\n");
             if(strcmp(command, "login") == 0)
             {
                 if(has_logged == 0)
@@ -113,13 +117,15 @@ void getCommand(int sockd)
             }
             else if(strcmp(command, "help") == 0)
             {
-                getHelp("Help.txt");
+                getHelp(sockd);
             }
             else if(strcmp(command, "exit") == 0)
             {
-                printf("Program incheiat cu succes.\n");
+                printf("Ati parasit competitia.\n");
                 fflush(stdout); exit(0);
             }
+            else if(strcmp(command, "time") == 0)
+                getTime(sockd);
             else
             {
                 printf("Comanda inexistenta. Apelatii comanda \'help\' pentru clarificari.\n");
@@ -127,6 +133,14 @@ void getCommand(int sockd)
             }
         }
     }
+}
+void getTime(int sockd)
+{
+    char message[16];
+    if(read(sockd, message, 16) < 0)
+        handle_error("[participant] Eroare la primirea timpului de la server.\n");
+    printf("Timp ramas: %s\n", message);
+    fflush(stdout);
 }
 int login(int sockd)
 {
@@ -139,35 +153,38 @@ int login(int sockd)
             break;
         printf("Introduceti username fara spatii : ");
     }
-    if(write(sockd, buffer, DIMBUF) <= 0)
+    if(write(sockd, buffer, DIMBUF) < 0)
         handle_error("[participant] Eroare la scrierea in socket a username-ului.\n");
     bzero(buffer, DIMBUF);
-    if(read(sockd, buffer, DIMBUF) <= 0)
+    if(read(sockd, buffer, DIMBUF) < 0)
         handle_error("[participant] Eroare la citirea din socket a mesajului.\n");
     printf("%s\n", buffer); fflush(stdout);
+    if(buffer[0] == 'U')
+        return 0;
     return 1;
 }
 int readProblem(int sockd)
 {
     char statement[DIMBUF*2], msg[50];
-    if(read(sockd, msg, 50) <= 0)
+    if(read(sockd, msg, 50) < 0)
         handle_error("[participant] Eroare la primirea mesajului de inceput.");
     printf("%s", msg); fflush(stdout);
-    if(read(sockd, statement, DIMBUF*2) <= 0)
+    if(read(sockd, statement, DIMBUF*2) < 0)
         handle_error("[participant] Eroare la primirea enuntului problemei.");
     printf("%s", statement); fflush(stdout);
     return 1;
 }
 int sendSourceCode(int sockd)
 {
-    char sourcename[20];
+    char sourcename[40];
     int fd;
     printf ("Intoduceti numele fisierului sursa (*.c, *.cpp): ");
     fflush (stdout);
     read (0, sourcename, DIMBUF);
     sourcename[strlen(sourcename) - 1] = '\0';
-    while((fd = open(sourcename, O_RDONLY)) <= 0)
+    while((fd = open(sourcename, O_RDONLY)) < 0)
     {
+        bzero(sourcename, 20);
         printf("Fisierul dat nu exista.\n");
         printf ("Intoduceti numele fisierului sursa (*.c, *.cpp): ");
         fflush (stdout);
@@ -175,7 +192,7 @@ int sendSourceCode(int sockd)
         sourcename[strlen(sourcename) - 1] = '\0';
     }
     close(fd);
-    if(write (sockd, sourcename, DIMBUF) <= 0)
+    if(write (sockd, sourcename, DIMBUF) < 0)
         handle_error("[participant] Eroare la trimiterea numelui fisierului sursa spre server.\n");
     int source_fd, readcode;
     char buffer[DIMBUF];
@@ -201,14 +218,17 @@ void receiveResults(int sockd)
 {
     char buffer[DIMBUF];
     printf("Se asteapta rezultatele.\n");
-    if(read(sockd, buffer, DIMBUF) <= 0)
+    if(read(sockd, buffer, DIMBUF) < 0)
         handle_error("[participant] Eroare la primirea rezultatelor.");
     printf("%s", buffer);
     fflush(stdout);
 }
-void getHelp(const char* helpFileName)
+void getHelp(int sockd)
 {
-    int help_fd;
-    printf("Help\n");
+    int readcode;
+    char buffer[DIMBUF];
+    if((readcode = read(sockd, buffer, DIMBUF)) < 0)
+        handle_error("[participant] Eroare la citirea mesajului help.\n");
+    printf("%s\n", buffer);
     fflush(stdout);
 }
