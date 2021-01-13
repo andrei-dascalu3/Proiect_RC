@@ -35,12 +35,13 @@ typedef struct {
 
 Thread *threadsPool;
 
-int sd, nthreads, problemCode, problemTime = 60*60;
+int sd, nthreads, problemCode = 1, problemTime = 20*60;
 pthread_mutex_t mlock=PTHREAD_MUTEX_INITIALIZER;
 
 chrono::high_resolution_clock::time_point startTime;
 
 void findUser(xmlNode* root, char* searched, bool& found);
+void buildProblem(char* statement, xmlNode* root);
 
 void configure();
 void threadCreate(int i);
@@ -49,7 +50,6 @@ void getCommand(int clientSock, char* sourceName, char* execName);
 void sendTime(int clientSock);
 void sendHelp(int clientSock);
 void login(int clientSock);
-int chooseProblem(int nrProblems);
 void sendProblem(int clientSock);
 void receiveSource(int clientSock, char* sourceName);
 void evaluateSource(int clientSock, char* sourceName, char* execName);
@@ -106,8 +106,7 @@ int main (int argc, char *argv[])
         handle_error("[server] Eroare la listen().", errno);
 
     printf("Numarul de participanti asteptati (fire de executie) = %d \n", nthreads); fflush(stdout);
-    int i, nrProblems = 1;
-    problemCode = chooseProblem(nrProblems);
+    int i;
 
     configure();
     for(i = 0; i < nthreads; i++)
@@ -134,7 +133,7 @@ void configure()
         else if(strcmp(command, "modify") == 0)
         {
             bzero(param, 0);
-            printf("Introduceti parametrul pe care doriti sa il modificati:\n-> participanti\n-> timp (min)\n");
+            printf("Introduceti parametrul pe care doriti sa il modificati:\n-> participanti\n-> id_problema\n");
             fflush(stdout);
             cin.getline(param, 20);
             if(strcmp(param, "participanti") == 0)
@@ -156,7 +155,7 @@ void configure()
                     threadsPool = (Thread*)calloc(nthreads, sizeof(Thread));
                 }
             }
-            else if(strcmp(param, "timp") == 0)
+            else if(strcmp(param, "id_problema") == 0)
             {
                 printf("Valoare : ");
                 fflush(stdout);
@@ -170,7 +169,7 @@ void configure()
                         break;
                     }
                 if(i = strlen(value))
-                    problemTime = atoi(value)*60;
+                    problemCode = atoi(value);
             }
             else
             {
@@ -293,28 +292,30 @@ void login(int clientSock)
         if(write(clientSock, msg, strlen(msg)) <= 0)
             handle_error("[server] Eroare la scrierea in socket.\n", errno);
     }
-}
-int chooseProblem(int nrProblems)
-{
-    srand(time(NULL));
-    return rand() % nrProblems;
+    xmlFreeDoc(doc);
+    xmlCleanupParser();
 }
 void sendProblem(int clientSock)
 {
+    xmlDoc *doc = NULL;
+    xmlNode *root_element = NULL;
+    int pbfd;
+    char statement[DIMBUF*2], msg[50] = "Competitia a inceput.\n";
+
     printf("[server] Se trimite enuntul problemei.\n");
-    char statement[DIMBUF*2], msg[50] = "Competitia a inceput. Timp : ", time[5];
-    itoa(time, problemTime);
-    strcat(msg, time); strcat(msg, "\n");
     if(write(clientSock, msg, strlen(msg)) <= 0)
         handle_error("[service] Eroare la trimiterea mesajului de inceput.\n", errno);
-    int pbfd;
     bzero(statement, DIMBUF*2);
-    if((pbfd = open("Probleme/Pb1.txt", O_RDONLY)) == -1)
-        handle_error("[server] Eroare la deschiderea fisierului cu enuntul problemei.\n", errno);
-    if(read(pbfd, statement, DIMBUF*2) <= 0)
-        handle_error("[service] Eroare la citirea enuntului problemei.\n", errno);
+
+    doc = xmlReadFile("Problems.xml", NULL, 0);
+    if (doc == NULL)
+        handle_error("[server] Eroare la parsarea fisierului \'Problems.xml\'.\n", 1);
+    root_element = xmlDocGetRootElement(doc);
+    buildProblem(statement, root_element);
     if(write(clientSock, statement, DIMBUF*2) <= 0)
         handle_error("[service] Eroare la trimiterea enuntului problemei.\n", errno);
+    xmlFreeDoc(doc);
+    xmlCleanupParser();
 }
 void receiveSource(int clientSock, char* sourceName)
 {
@@ -397,4 +398,59 @@ void findUser(xmlNode* root, char* searched, bool& found)
         }
         findUser(cur_node->children, searched, found);
     }
+}
+void buildProblem(char* statement, xmlNode* root)
+{
+    xmlNode* cur_node = NULL, *section = NULL;
+    int number;
+    char id[2];
+    sprintf(id, "%d", problemCode);
+    strcpy(statement, "______________________________\n");
+    for(cur_node = root->children; cur_node; cur_node = cur_node->next)
+    {
+        if(cur_node->type == XML_ELEMENT_NODE && strcmp((const char*)cur_node->name, "PROBLEM") == 0)
+        {
+            number = atoi((const char*)xmlGetProp(cur_node, (const xmlChar*)"id"));
+            if(number == problemCode)
+            {
+                strcat(statement, "["); strcat(statement, id); strcat(statement, "]\n");
+                for(section = cur_node->children; strcmp((const char*)section->name, "TESTS") != 0 && section; section = section->next)
+                {
+                    if(section->type == XML_ELEMENT_NODE)
+                    {
+                        if(strcmp((const char*)section->name, "TITLE") == 0)
+                        {
+                            strcat(statement, "~");
+                            strcat(statement, (const char*)section->children->content);
+                            strcat(statement, "~");
+                            strcat(statement, "\n\n");
+                        }
+                        else if(strcmp((const char*)section->name, "IN_NAME") == 0)
+                        {
+                            strcat(statement, "INPUT: ");
+                            strcat(statement, (const char*)section->children->content);
+                            strcat(statement, "\n");
+                        }
+                        else if(strcmp((const char*)section->name, "OUT_NAME") == 0)
+                        {
+                            strcat(statement, "OUTPUT: ");
+                            strcat(statement, (const char*)section->children->content);
+                            strcat(statement, "\n");
+                        }
+                        else if(strcmp((const char*)section->name, "TIME") == 0)
+                        {
+                            strcat(statement, "TIMP (min):\n");
+                            strcat(statement, (const char*)section->children->content);
+                            strcat(statement, "\n\n");
+                        }
+                        else{
+                            strcat(statement, (const char*)section->children->content);
+                            strcat(statement, "\n\n");
+                        }
+                    }
+                }
+            }
+        }
+    }
+    strcat(statement, "______________________________\n");
 }

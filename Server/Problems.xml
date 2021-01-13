@@ -2,9 +2,7 @@
 <PROBLEMS>
     <PROBLEM id="1">
         <TITLE>Suma a 2 numere</TITLE>
-        <STATEMENT>
-        Fie a si b doua numere intregi citite din fisierul pb1.in. Afisati suma lor in fiserul pb1.out.
-        </STATEMENT>
+        <STATEMENT>Fie a si b doua numere intregi citite din fisierul pb1.in. Afisati suma lor in fiserul pb1.out.</STATEMENT>
         <IN_NAME>pb1.in</IN_NAME>
         <IN_EX>10 7</IN_EX>
         <OUT_NAME>pb1.out</OUT_NAME>
@@ -35,9 +33,7 @@
     </PROBLEM>
     <PROBLEM id="2">
         <TITLE>Produsul a 2 numere</TITLE>
-        <STATEMENT>
-        Fie a si b doua numere intregi citite din fisierul pb2.in. Afisati produsul lor in fiserul pb2.out.
-        </STATEMENT>
+        <STATEMENT>Fie a si b doua numere intregi citite din fisierul pb2.in. Afisati produsul lor in fiserul pb2.out.</STATEMENT>
         <IN_EX>pb2.in</IN_EX>
         <INPUT>10 7</INPUT>
         <OUT_NAME>pb2.out</OUT_NAME>
@@ -68,9 +64,7 @@
     </PROBLEM>
     <PROBLEM id="3">
         <TITLE>Pozitia unui caracter intr-un sir</TITLE>
-        <STATEMENT>
-        Fie s un sir de caractere si c un caracter, delimitate de spatiu si citite din fisierul pb3.in. Afisati pozitia primei aparitii a caracteruli c in sirul s sinumarul de aparitii al lui c in sirul s, separate prin spatiu, in fisierul pb3.out. Daca acesta nu exista, afisati mesajul "Caracter negasit".
-        </STATEMENT>
+        <STATEMENT>Fie s un sir de caractere si c un caracter, delimitate de spatiu si citite din fisierul pb3.in. Afisati pozitia primei aparitii a caracteruli c in sirul s sinumarul de aparitii al lui c in sirul s, separate prin spatiu, in fisierul pb3.out. Daca acesta nu exista, afisati mesajul "Caracter negasit".</STATEMENT>
         <IN_EX>pb3.in</IN_EX>
         <INPUT>mar a</INPUT>
         <OUT_NAME>pb3.out</OUT_NAME>
