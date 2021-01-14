@@ -1,17 +1,18 @@
 #include <iostream>
 #include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <errno.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdlib.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <sys/file.h>
+#include <netinet/in.h>
+#include <errno.h>
 #include <signal.h>
 #include <pthread.h>
 #include <arpa/inet.h>
-#include <sys/file.h>
-#include <stdlib.h>
 #include <time.h>
 #include <chrono>
 #include <libxml2/libxml/parser.h>
@@ -28,7 +29,8 @@ using namespace std;
 extern int errno;
 static void *treat(void *);
 
-typedef struct {
+typedef struct
+{
     pthread_t idThread;
     int thCount;
 } Thread;
@@ -51,7 +53,7 @@ void sendTime(int clientSock);
 void sendHelp(int clientSock);
 void login(int clientSock);
 void sendProblem(int clientSock);
-void receiveSource(int clientSock, char* sourceName);
+void receiveSource(int clientSock, char* sourceName, char* execName);
 void evaluateSource(int clientSock, char* sourceName, char* execName);
 void itoa(char number[10], int N)
 {
@@ -105,7 +107,8 @@ int main (int argc, char *argv[])
     if (listen (sd, 2) == -1)
         handle_error("[server] Eroare la listen().", errno);
 
-    printf("Numarul de participanti asteptati (fire de executie) = %d \n", nthreads); fflush(stdout);
+    printf("Numarul de participanti asteptati (fire de executie) = %d \n", nthreads);
+    fflush(stdout);
     int i;
 
     configure();
@@ -196,7 +199,8 @@ void *treat(void * arg)
     printf ("[thread]- %d - pornit...\n", tag);
     fflush(stdout);
 
-    while(1) {
+    while(1)
+    {
         socklen_t length = sizeof (from);
         pthread_mutex_lock(&mlock);
 
@@ -208,10 +212,13 @@ void *treat(void * arg)
         getCommand(client, sourceName, execName);
     }
 }
-void getCommand(int clientSock, char* sourceName, char* execName) {
+void getCommand(int clientSock, char* sourceName, char* execName)
+{
     char command[25];
     int readcode, help_fd;
-    while(1) {
+    while(1)
+    {
+        bzero(command, 25);
         if((readcode = read(clientSock, command, 25)) < 0)
             handle_error("[server] Eroare la citirea comenzii de la participant.\n", errno);
         if(strcmp(command, "login") == 0)
@@ -220,7 +227,7 @@ void getCommand(int clientSock, char* sourceName, char* execName) {
             sendProblem(clientSock);
         else if(strcmp(command, "send_source") == 0)
         {
-            receiveSource(clientSock, sourceName);
+            receiveSource(clientSock, sourceName, execName);
             evaluateSource(clientSock, sourceName, execName);
         }
         else if(strcmp(command, "help") == 0)
@@ -241,7 +248,8 @@ void sendTime(int clientSock)
     auto timeNow = std::chrono::high_resolution_clock::now();
     chrono::duration<int> elapsed = chrono::duration_cast<chrono::seconds>(timeNow - startTime);
     int remained = problemTime - int(elapsed.count());
-    itoa(minutes, remained/60); cout<<remained/60<<' '<<remained%60<<endl;
+    itoa(minutes, remained/60);
+    cout<<remained/60<<' '<<remained%60<<endl;
     itoa(seconds, remained%60);
     strcpy(message, minutes);
     strcat(message, " : ");
@@ -281,7 +289,8 @@ void login(int clientSock)
     {
 
         printf("Utilizator %s logat.\n", buffer);
-        strcat(msg, buffer); strcat(msg, "\n");
+        strcat(msg, buffer);
+        strcat(msg, "\n");
         if(write(clientSock, msg, strlen(msg)) <= 0)
             handle_error("[server] Eroare la scrierea in socket.\n", errno);
     }
@@ -317,24 +326,48 @@ void sendProblem(int clientSock)
     xmlFreeDoc(doc);
     xmlCleanupParser();
 }
-void receiveSource(int clientSock, char* sourceName)
+void receiveSource(int clientSock, char* sourceName, char* execName)
 {
+    struct stat dirStat;
     printf("[server] Se accepta surse cu rezolvarea problemei.\n");
     int source_fd, readcode;
-    char buffer[DIMBUF], *dot;
-    sourceName[0] = '_';
-    if(read(clientSock, sourceName + 1, DIMBUF) < 0)
+    char buffer[DIMBUF], *extension, dirName[100], inputFile[100], outputFile[100];
+    if(read(clientSock, buffer, DIMBUF) < 0)
         handle_error("[server] Eroare la citirea numelui fisierului sursa trimis.\n", errno);
 
+///Construirea numelor directorului specific concurentului + fisiere
+    ///Director
+    extension = strchr(buffer, '.');
+    *extension = '\0';
+    strcpy(dirName, "_"); strcat(dirName, buffer);
+    *extension = '.';
+    if(-1 == stat(dirName, &dirStat))
+        mkdir(dirName, 0700);
+
+    ///Sursa
+    strcpy(sourceName, dirName); strcat(sourceName, "/"); strcat(sourceName, buffer);
     if((source_fd = open(sourceName, O_RDWR | O_CREAT, 0644)) == -1)
         handle_error("[server] Eroare la crearea fisierului sursa de catre server.\n", errno);
+
+    ///Executabil
+    *extension = '\0';
+    strcpy(execName, dirName); strcat(execName, "/"); strcat(execName, buffer);
+    *extension = '.';
+
+    ///Fisiere I/O
+    strcpy(inputFile, dirName); strcat(inputFile, "/"); strcat(inputFile, "File.in");
+    strcpy(outputFile, dirName); strcat(outputFile, "/"); strcat(outputFile, "File.out");
+    if(-1 == stat(inputFile, &dirStat))
+        open(inputFile, O_CREAT, 0655);
+    if(-1 == stat(outputFile, &dirStat))
+        open(outputFile, O_CREAT, 0655);
 
     while(1)
     {
         bzero(buffer, DIMBUF);
         if((readcode = read(clientSock, buffer, DIMBUF)) < 0)
             handle_error("[server] Eroare la citirea din socket.\n", errno);
-        if(write(source_fd, buffer, DIMBUF) < 0)
+        if(write(source_fd, buffer, readcode) < 0)
             handle_error("[server] Eroare la scrierea in fisierul sursa.\n", errno);
         if(readcode <= DIMBUF)
             break;
@@ -347,32 +380,50 @@ void receiveSource(int clientSock, char* sourceName)
 void evaluateSource(int clientSock, char* sourceName, char* execName)
 {
     pid_t child;
-    char *extension;
+    int ii;
+    char buffer[DIMBUF], *extension;
 
+    extension = strchr(sourceName, '.');
+///Compilarea sursei participantului
     if(-1 == (child = fork()))
         handle_error("[server] Eroare la compilarea sursei primite.\n", errno);
-///Compilarea sursei participantului
     if(child == 0)
     {
-        if((extension = strstr(sourceName, ".cpp")) != NULL)
+        if(strcmp(extension, ".cpp") == 0)
         {
-            *extension = '\0';
-            strcpy(execName, sourceName);
-            *extension = '.';
             printf("[server] Fisier C++.\n");
             if(-1 == execlp("g++", "g++", sourceName, "-o", execName, NULL))
                 handle_error("[server] Eroare la compilarea sursei primite.\n", errno);
         }
-        else if((extension = strstr(sourceName, ".c")) != NULL)
+        else if(strcmp(extension, ".c") == 0)
         {
-            *extension = '\0';
-            strcpy(execName, sourceName);
-            *extension = '.';
             printf("[server] Fisier C.\n");
             if(-1 == execlp("gcc", "gcc", sourceName, "-o", execName, NULL))
                 handle_error("[server] Eroare la compilarea sursei primite.\n", errno);
         }
     }
+    else
+    {
+        waitpid(child, NULL, 0);
+    }
+
+///Evaluarea sursei participantului
+    child = 0;
+    for(ii = 1; ii <= 5; ++ii)
+    {
+        if(-1 == (child = fork()))
+            handle_error("[server] Eroare la evaluarea sursei primite.\n", errno);
+        if(child == 0)
+        {
+            if(-1 == execlp(execName, execName, NULL))
+                handle_error("[server] Eroare la evaluarea sursei primite.\n", errno);
+        }
+        else
+        {
+            waitpid(child, NULL, 0);
+        }
+    }
+
     printf("[server] Se evalueaza sursele primite si transmitem rezultatele.\n");
     if(write(clientSock, "Test 1 : 25 puncte\nTest 2 : 25 puncte\nTest 3 : 25 puncte\nTest 4 : 25 puncte\n\nTotal: 100 puncte\n", DIMBUF) < 0)
         handle_error("[server] Eroare la trimiterea rezultatelor.", errno);
@@ -413,7 +464,9 @@ void buildProblem(char* statement, xmlNode* root)
             number = atoi((const char*)xmlGetProp(cur_node, (const xmlChar*)"id"));
             if(number == problemCode)
             {
-                strcat(statement, "["); strcat(statement, id); strcat(statement, "]\n");
+                strcat(statement, "[");
+                strcat(statement, id);
+                strcat(statement, "]\n");
                 for(section = cur_node->children; strcmp((const char*)section->name, "TESTS") != 0 && section; section = section->next)
                 {
                     if(section->type == XML_ELEMENT_NODE)
@@ -443,7 +496,8 @@ void buildProblem(char* statement, xmlNode* root)
                             strcat(statement, (const char*)section->children->content);
                             strcat(statement, "\n\n");
                         }
-                        else{
+                        else
+                        {
                             strcat(statement, (const char*)section->children->content);
                             strcat(statement, "\n\n");
                         }

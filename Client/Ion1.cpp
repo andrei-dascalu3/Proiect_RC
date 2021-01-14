@@ -1,9 +1,10 @@
-#include <iostream>
+#include <fstream>
 
 using namespace std;
+ofstream fout("File.out");
 
 int main()
 {
-    cout<<"Hello world!\n";
+    fout<<"Hello world!\n";
     return 0;
 }

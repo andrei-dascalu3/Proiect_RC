@@ -1,6 +1,0 @@
-[1] Suma a 2 numere
-Fie a si b doua numere naturale citite din fisierul pb1.in. Afisati suma lor in fiserul pb1.out.
-Input:
-10 7
-Output:
-17

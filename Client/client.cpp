@@ -71,12 +71,12 @@ void getCommand(int sockd)
         }
         else
         {
-            if(write(sockd, command, 25) < 0)
-                handle_error("[participant] Eroare la transmiterea comenzii catre server.\n");
             if(strcmp(command, "login") == 0)
             {
                 if(has_logged == 0)
                 {
+                    if(write(sockd, command, 25) < 0)
+                        handle_error("[participant] Eroare la transmiterea comenzii catre server.\n");
                     has_logged = login(sockd);
                 }
                 else
@@ -94,6 +94,8 @@ void getCommand(int sockd)
                 }
                 else
                 {
+                    if(write(sockd, command, 25) < 0)
+                        handle_error("[participant] Eroare la transmiterea comenzii catre server.\n");
                     has_read = readProblem(sockd);
                 }
             }
@@ -111,12 +113,16 @@ void getCommand(int sockd)
                 }
                 else
                 {
+                    if(write(sockd, command, 25) < 0)
+                        handle_error("[participant] Eroare la transmiterea comenzii catre server.\n");
                     has_sent = sendSourceCode(sockd);
                     receiveResults(sockd);
                 }
             }
             else if(strcmp(command, "help") == 0)
             {
+                if(write(sockd, command, 25) < 0)
+                        handle_error("[participant] Eroare la transmiterea comenzii catre server.\n");
                 getHelp(sockd);
             }
             else if(strcmp(command, "exit") == 0)
@@ -125,7 +131,11 @@ void getCommand(int sockd)
                 fflush(stdout); exit(0);
             }
             else if(strcmp(command, "time") == 0)
+            {
+                if(write(sockd, command, 25) < 0)
+                        handle_error("[participant] Eroare la transmiterea comenzii catre server.\n");
                 getTime(sockd);
+            }
             else
             {
                 printf("Comanda inexistenta. Apelatii comanda \'help\' pentru clarificari.\n");
@@ -207,7 +217,6 @@ int sendSourceCode(int sockd)
             handle_error("[participant] Eroare la citirea din fisierul sursa.\n");
         if(write(sockd, buffer, DIMBUF) < 0)
             handle_error("[participant] Eroare la scrierea in socket a fisierului sursa.\n");
-        printf("%s", buffer);
         if(readcode <= DIMBUF)
             break;
     }
