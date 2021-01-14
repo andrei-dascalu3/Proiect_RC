@@ -1,10 +1,11 @@
 #include <fstream>
 
 using namespace std;
-ofstream fout("File.out");
+ifstream fin("pb1.in");
+ofstream fout("pb1.out");
 
 int main()
 {
-    fout<<"Hello world!\n";
+    fout<<"2021\n";
     return 0;
 }

@@ -44,17 +44,19 @@ chrono::high_resolution_clock::time_point startTime;
 
 void findUser(xmlNode* root, char* searched, bool& found);
 void buildProblem(char* statement, xmlNode* root);
+void getIO(char* file, char type);
+void modifyInput(char* correct, char* inputFile, int idProblem);
 
 void configure();
 void threadCreate(int i);
 void *treat(void * arg);
-void getCommand(int clientSock, char* sourceName, char* execName);
+void getCommand(int clientSock, char* sourceName, char* execName, char* dirName);
 void sendTime(int clientSock);
 void sendHelp(int clientSock);
 void login(int clientSock);
 void sendProblem(int clientSock);
-void receiveSource(int clientSock, char* sourceName, char* execName);
-void evaluateSource(int clientSock, char* sourceName, char* execName);
+void receiveSource(int clientSock, char* sourceName, char* execName, char* dirName);
+void evaluateSource(int clientSock, char* sourceName, char* execName, char* dirName);
 void itoa(char number[10], int N)
 {
     bzero(number, 0);
@@ -192,7 +194,7 @@ void threadCreate(int i)
 void *treat(void * arg)
 {
     int client, tag;
-    char sourceName[DIMBUF], execName[DIMBUF];
+    char sourceName[100], execName[100], dirName[200];
     struct sockaddr_in from;
     bzero (&from, sizeof (from));
     tag = *((int*) arg);
@@ -209,10 +211,10 @@ void *treat(void * arg)
         pthread_mutex_unlock(&mlock);
         threadsPool[tag].thCount++;
 
-        getCommand(client, sourceName, execName);
+        getCommand(client, sourceName, execName, dirName);
     }
 }
-void getCommand(int clientSock, char* sourceName, char* execName)
+void getCommand(int clientSock, char* sourceName, char* execName, char* dirName)
 {
     char command[25];
     int readcode, help_fd;
@@ -227,8 +229,8 @@ void getCommand(int clientSock, char* sourceName, char* execName)
             sendProblem(clientSock);
         else if(strcmp(command, "send_source") == 0)
         {
-            receiveSource(clientSock, sourceName, execName);
-            evaluateSource(clientSock, sourceName, execName);
+            receiveSource(clientSock, sourceName, execName, dirName);
+            evaluateSource(clientSock, sourceName, execName, dirName);
         }
         else if(strcmp(command, "help") == 0)
             sendHelp(clientSock);
@@ -326,12 +328,12 @@ void sendProblem(int clientSock)
     xmlFreeDoc(doc);
     xmlCleanupParser();
 }
-void receiveSource(int clientSock, char* sourceName, char* execName)
+void receiveSource(int clientSock, char* sourceName, char* execName, char* dirName)
 {
     struct stat dirStat;
     printf("[server] Se accepta surse cu rezolvarea problemei.\n");
     int source_fd, readcode;
-    char buffer[DIMBUF], *extension, dirName[100], inputFile[100], outputFile[100];
+    char buffer[DIMBUF], *extension, inputFile[100], outputFile[100];
     if(read(clientSock, buffer, DIMBUF) < 0)
         handle_error("[server] Eroare la citirea numelui fisierului sursa trimis.\n", errno);
 
@@ -344,19 +346,20 @@ void receiveSource(int clientSock, char* sourceName, char* execName)
     if(-1 == stat(dirName, &dirStat))
         mkdir(dirName, 0700);
 
+    chdir(dirName);
     ///Sursa
-    strcpy(sourceName, dirName); strcat(sourceName, "/"); strcat(sourceName, buffer);
+    strcpy(sourceName, buffer);
     if((source_fd = open(sourceName, O_RDWR | O_CREAT, 0644)) == -1)
         handle_error("[server] Eroare la crearea fisierului sursa de catre server.\n", errno);
 
     ///Executabil
     *extension = '\0';
-    strcpy(execName, dirName); strcat(execName, "/"); strcat(execName, buffer);
+    strcpy(execName, buffer);
     *extension = '.';
 
     ///Fisiere I/O
-    strcpy(inputFile, dirName); strcat(inputFile, "/"); strcat(inputFile, "File.in");
-    strcpy(outputFile, dirName); strcat(outputFile, "/"); strcat(outputFile, "File.out");
+    getIO(inputFile, 'I');
+    getIO(outputFile, 'O');
     if(-1 == stat(inputFile, &dirStat))
         open(inputFile, O_CREAT, 0655);
     if(-1 == stat(outputFile, &dirStat))
@@ -375,16 +378,21 @@ void receiveSource(int clientSock, char* sourceName, char* execName)
     /*if(write(clientSock, "Am primit fisierul sursa.\n", DIMBUF) < 0)
         handle_error("[server] Eroare la scrierea in socket.\n", errno);
     */
+    chdir("..");
     close(source_fd);
 }
-void evaluateSource(int clientSock, char* sourceName, char* execName)
+void evaluateSource(int clientSock, char* sourceName, char* execName, char* dirName)
 {
+    struct stat st;
     pid_t child;
     int ii;
-    char buffer[DIMBUF], *extension;
+    char buffer[DIMBUF], results[DIMBUF], *extension, correct[DIMBUF], inputFile[100], outputFile[100];
 
+    chdir(dirName);
     extension = strchr(sourceName, '.');
 ///Compilarea sursei participantului
+    getIO(inputFile, 'I');
+    getIO(outputFile, 'O');
     if(-1 == (child = fork()))
         handle_error("[server] Eroare la compilarea sursei primite.\n", errno);
     if(child == 0)
@@ -393,13 +401,21 @@ void evaluateSource(int clientSock, char* sourceName, char* execName)
         {
             printf("[server] Fisier C++.\n");
             if(-1 == execlp("g++", "g++", sourceName, "-o", execName, NULL))
+            {
+                if(write(clientSock, "Compilarea sursei a esuat.\n", DIMBUF) < 0)
+                    handle_error("[server] Eroare la trimiterea rezultatelor.", errno);
                 handle_error("[server] Eroare la compilarea sursei primite.\n", errno);
+            }
         }
         else if(strcmp(extension, ".c") == 0)
         {
             printf("[server] Fisier C.\n");
             if(-1 == execlp("gcc", "gcc", sourceName, "-o", execName, NULL))
+            {
+                if(write(clientSock, "Compilarea sursei a esuat.\n", DIMBUF) < 0)
+                    handle_error("[server] Eroare la trimiterea rezultatelor.", errno);
                 handle_error("[server] Eroare la compilarea sursei primite.\n", errno);
+            }
         }
     }
     else
@@ -408,27 +424,31 @@ void evaluateSource(int clientSock, char* sourceName, char* execName)
     }
 
 ///Evaluarea sursei participantului
+    printf("[server] Se evalueaza sursele primite si transmitem rezultatele.\n");
     child = 0;
     for(ii = 1; ii <= 5; ++ii)
     {
+        bzero(correct, DIMBUF);
+        modifyInput(correct, inputFile, ii);
         if(-1 == (child = fork()))
             handle_error("[server] Eroare la evaluarea sursei primite.\n", errno);
         if(child == 0)
         {
-            if(-1 == execlp(execName, execName, NULL))
+            if(-1 == execl(execName, execName, NULL))
                 handle_error("[server] Eroare la evaluarea sursei primite.\n", errno);
         }
         else
         {
+
             waitpid(child, NULL, 0);
         }
     }
 
-    printf("[server] Se evalueaza sursele primite si transmitem rezultatele.\n");
-    if(write(clientSock, "Test 1 : 25 puncte\nTest 2 : 25 puncte\nTest 3 : 25 puncte\nTest 4 : 25 puncte\n\nTotal: 100 puncte\n", DIMBUF) < 0)
+    if(write(clientSock, results, DIMBUF) < 0)
         handle_error("[server] Eroare la trimiterea rezultatelor.", errno);
     printf("[server] Am transmis rezultatele.\n");
     fflush(stdout);
+    chdir("..");
 }
 
 void findUser(xmlNode* root, char* searched, bool& found)
@@ -507,4 +527,103 @@ void buildProblem(char* statement, xmlNode* root)
         }
     }
     strcat(statement, "______________________________\n");
+}
+void getIO(char* file, char type)
+{
+    xmlDoc *doc = NULL;
+    xmlNode *root_element = NULL;
+    xmlNode* cur_node = NULL, *section = NULL;
+    int number;
+    char id[2];
+    doc = xmlReadFile("../Problems.xml", NULL, 0);
+    root_element = xmlDocGetRootElement(doc);
+    if (doc == NULL)
+        handle_error("[server] Eroare la parsarea fisierului \'Problems.xml\'.\n", 1);
+    sprintf(id, "%d", problemCode);
+    for(cur_node = root_element->children; cur_node; cur_node = cur_node->next)
+    {
+        if(cur_node->type == XML_ELEMENT_NODE && strcmp((const char*)cur_node->name, "PROBLEM") == 0)
+        {
+            number = atoi((const char*)xmlGetProp(cur_node, (const xmlChar*)"id"));
+            if(number == problemCode)
+            {
+                for(section = cur_node->children; strcmp((const char*)section->name, "TESTS") != 0 && section; section = section->next)
+                {
+                    if(section->type == XML_ELEMENT_NODE)
+                    {
+                        if(strcmp((const char*)section->name, "IN_NAME") == 0 && type == 'I')
+                        {
+                            strcpy(file, (const char*)section->children->content);
+                            printf("%s\n", file); fflush(stdout);
+                            return;
+                        }
+                        else if(strcmp((const char*)section->name, "OUT_NAME") == 0 && type == 'O')
+                        {
+                            strcpy(file, (const char*)section->children->content);
+                            printf("%s\n", file); fflush(stdout);
+                            xmlFreeDoc(doc);
+                            xmlCleanupParser();
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    xmlFreeDoc(doc);
+    xmlCleanupParser();
+}
+void modifyInput(char* correct, char* inputFile, int idTest)
+{
+    xmlDoc *doc = NULL;
+    xmlNode *root_element = NULL;
+    xmlNode* cur_node = NULL, *section = NULL, *testNode, *indata, *outdata;
+    int number, inputFD;
+    char id[2];
+    int test;
+
+    doc = xmlReadFile("../Problems.xml", NULL, 0);
+    root_element = xmlDocGetRootElement(doc);
+    if (doc == NULL)
+        handle_error("[server] Eroare la parsarea fisierului \'Problems.xml\'.\n", 1);
+
+    inputFD = open(inputFile, O_RDWR);
+    sprintf(id, "%d", problemCode);
+    for(cur_node = root_element->children; cur_node; cur_node = cur_node->next)
+    {
+        if(cur_node->type == XML_ELEMENT_NODE && strcmp((const char*)cur_node->name, "PROBLEM") == 0)
+        {
+            number = atoi((const char*)xmlGetProp(cur_node, (const xmlChar*)"id"));
+            if(number == problemCode)
+            {
+                for(section = cur_node->children; strcmp((const char*)section->name, "TESTS") != 0 && section; section = section->next);
+                for(testNode = section->children; testNode; testNode = testNode->next)
+                {
+                    if(testNode->type == XML_ELEMENT_NODE && strcmp((const char*)testNode->name, "TEST") == 0)
+                    {
+                        test = atoi((const char*)xmlGetProp(testNode, (const xmlChar*)"id"));
+                        printf("%d\n", test);
+                        if(test == idTest)
+                        {
+                            indata = testNode->children;
+                            while(indata->type != XML_ELEMENT_NODE)
+                                indata = indata->next;
+                            write(inputFD, (const char*)indata->children->content, DIMBUF);
+                            outdata = indata->next;
+                            while(outdata->type != XML_ELEMENT_NODE)
+                                outdata = outdata->next;
+                            strcpy(correct, (const char*)outdata->children->content);
+                            xmlFreeDoc(doc);
+                            xmlCleanupParser();
+                            close(inputFD);
+                            return;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    xmlFreeDoc(doc);
+    xmlCleanupParser();
+    close(inputFD);
 }
