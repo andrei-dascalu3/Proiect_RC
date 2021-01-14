@@ -1,4 +1,5 @@
 #include <iostream>
+#include <fstream>
 #include <sys/types.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -385,8 +386,8 @@ void evaluateSource(int clientSock, char* sourceName, char* execName, char* dirN
 {
     struct stat st;
     pid_t child;
-    int ii;
-    char buffer[DIMBUF], results[DIMBUF], *extension, correct[DIMBUF], inputFile[100], outputFile[100];
+    int ii, outFD, totalScore = 0;
+    char buffer[DIMBUF], results[DIMBUF] = "Rezultate:\n", *extension, correct[DIMBUF], inputFile[100], outputFile[100], testStr[4];
 
     chdir(dirName);
     extension = strchr(sourceName, '.');
@@ -400,7 +401,7 @@ void evaluateSource(int clientSock, char* sourceName, char* execName, char* dirN
         if(strcmp(extension, ".cpp") == 0)
         {
             printf("[server] Fisier C++.\n");
-            if(-1 == execlp("g++", "g++", sourceName, "-o", execName, NULL))
+            if(-1 == execlp("g++", "g++", "-W", sourceName, "-o", execName, NULL))
             {
                 if(write(clientSock, "Compilarea sursei a esuat.\n", DIMBUF) < 0)
                     handle_error("[server] Eroare la trimiterea rezultatelor.", errno);
@@ -410,7 +411,7 @@ void evaluateSource(int clientSock, char* sourceName, char* execName, char* dirN
         else if(strcmp(extension, ".c") == 0)
         {
             printf("[server] Fisier C.\n");
-            if(-1 == execlp("gcc", "gcc", sourceName, "-o", execName, NULL))
+            if(-1 == execlp("gcc", "gcc", "-W", sourceName, "-o", execName, NULL))
             {
                 if(write(clientSock, "Compilarea sursei a esuat.\n", DIMBUF) < 0)
                     handle_error("[server] Eroare la trimiterea rezultatelor.", errno);
@@ -429,6 +430,8 @@ void evaluateSource(int clientSock, char* sourceName, char* execName, char* dirN
     for(ii = 1; ii <= 5; ++ii)
     {
         bzero(correct, DIMBUF);
+        bzero(buffer, DIMBUF);
+        bzero(testStr, 4);
         modifyInput(correct, inputFile, ii);
         if(-1 == (child = fork()))
             handle_error("[server] Eroare la evaluarea sursei primite.\n", errno);
@@ -439,11 +442,23 @@ void evaluateSource(int clientSock, char* sourceName, char* execName, char* dirN
         }
         else
         {
-
             waitpid(child, NULL, 0);
+            outFD = open(outputFile, O_RDONLY);
+            read(outFD, buffer, DIMBUF);
+            close(outFD);
+            buffer[strlen(correct)] = '\0';
+            if(strcmp(buffer, correct) == 0)
+            {
+                totalScore += 20;
+                strcat(results, "Testul "); itoa(testStr, ii); strcat(results, testStr); strcat(results, ": 20 pct\n");
+            }
+            else
+            {
+                strcat(results, "Testul "); itoa(testStr, ii); strcat(results, testStr); strcat(results, ": 0 pct\n");
+            }
         }
     }
-
+    strcat(results, "Total: "); itoa(testStr, totalScore); strcat(results, testStr); strcat(results, "\n");
     if(write(clientSock, results, DIMBUF) < 0)
         handle_error("[server] Eroare la trimiterea rezultatelor.", errno);
     printf("[server] Am transmis rezultatele.\n");
@@ -578,16 +593,16 @@ void modifyInput(char* correct, char* inputFile, int idTest)
     xmlDoc *doc = NULL;
     xmlNode *root_element = NULL;
     xmlNode* cur_node = NULL, *section = NULL, *testNode, *indata, *outdata;
-    int number, inputFD;
+    int number, inputFD, test;
     char id[2];
-    int test;
+    ofstream fout(inputFile);
 
     doc = xmlReadFile("../Problems.xml", NULL, 0);
     root_element = xmlDocGetRootElement(doc);
     if (doc == NULL)
         handle_error("[server] Eroare la parsarea fisierului \'Problems.xml\'.\n", 1);
 
-    inputFD = open(inputFile, O_RDWR);
+    //inputFD = open(inputFile, O_RDWR);
     sprintf(id, "%d", problemCode);
     for(cur_node = root_element->children; cur_node; cur_node = cur_node->next)
     {
@@ -602,20 +617,20 @@ void modifyInput(char* correct, char* inputFile, int idTest)
                     if(testNode->type == XML_ELEMENT_NODE && strcmp((const char*)testNode->name, "TEST") == 0)
                     {
                         test = atoi((const char*)xmlGetProp(testNode, (const xmlChar*)"id"));
-                        printf("%d\n", test);
                         if(test == idTest)
                         {
+
                             indata = testNode->children;
                             while(indata->type != XML_ELEMENT_NODE)
                                 indata = indata->next;
-                            write(inputFD, (const char*)indata->children->content, DIMBUF);
+                            fout << (const char*)indata->children->content;
                             outdata = indata->next;
                             while(outdata->type != XML_ELEMENT_NODE)
                                 outdata = outdata->next;
                             strcpy(correct, (const char*)outdata->children->content);
                             xmlFreeDoc(doc);
                             xmlCleanupParser();
-                            close(inputFD);
+                            //close(inputFD);
                             return;
                         }
                     }
@@ -625,5 +640,5 @@ void modifyInput(char* correct, char* inputFile, int idTest)
     }
     xmlFreeDoc(doc);
     xmlCleanupParser();
-    close(inputFD);
+    //close(inputFD);
 }
