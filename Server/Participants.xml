@@ -5,4 +5,14 @@
         <SCORE>0</SCORE>
         <UPLOADTIME>0</UPLOADTIME>
     </USER>
+    <USER id = "2">
+        <USERNAME>Dan</USERNAME>
+        <SCORE>0</SCORE>
+        <UPLOADTIME>0</UPLOADTIME>
+    </USER>
+    <USER id = "3">
+        <USERNAME>Ben</USERNAME>
+        <SCORE>0</SCORE>
+        <UPLOADTIME>0</UPLOADTIME>
+    </USER>
 </USERS>

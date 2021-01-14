@@ -41,13 +41,15 @@ Thread *threadsPool;
 int sd, nthreads, problemCode = 1, problemTime = 20*60;
 pthread_mutex_t mlock=PTHREAD_MUTEX_INITIALIZER;
 
+///Timpul de inceput
 chrono::high_resolution_clock::time_point startTime;
-
+///Functii de lucru cu XML
 void findUser(xmlNode* root, char* searched, bool& found);
 void buildProblem(char* statement, xmlNode* root);
 void getIO(char* file, char type);
 void modifyInput(char* correct, char* inputFile, int idProblem);
-
+void removeDir(char* dirName);
+///Functii
 void configure();
 void threadCreate(int i);
 void *treat(void * arg);
@@ -124,7 +126,7 @@ int main (int argc, char *argv[])
         pause();
     }
 }
-
+///Configurarea datelor (nr. participanti si id problema)
 void configure()
 {
     char command[10], param[20], value[5], i;
@@ -186,12 +188,13 @@ void configure()
     }
     startTime = chrono::high_resolution_clock::now();
 }
+///Crearea firelor de executie
 void threadCreate(int i)
 {
     pthread_create(&threadsPool[i].idThread, NULL, &treat, &i);
     return;
 }
-
+///Tratarea clientului
 void *treat(void * arg)
 {
     int client, tag;
@@ -213,8 +216,15 @@ void *treat(void * arg)
         threadsPool[tag].thCount++;
 
         getCommand(client, sourceName, execName, dirName);
+
+        auto timeNow = std::chrono::high_resolution_clock::now();
+        chrono::duration<int> elapsed = chrono::duration_cast<chrono::seconds>(timeNow - startTime);
+        int remained = problemTime - int(elapsed.count());
+        if(remained <= 0)
+            close(client);
     }
 }
+///Primirea comenzii
 void getCommand(int clientSock, char* sourceName, char* execName, char* dirName)
 {
     char command[25];
@@ -245,6 +255,7 @@ void getCommand(int clientSock, char* sourceName, char* execName, char* dirName)
     }
 
 }
+///Trimiterea timpului ramas
 void sendTime(int clientSock)
 {
     char message[16], minutes[3], seconds[3];
@@ -261,6 +272,7 @@ void sendTime(int clientSock)
     if(write(clientSock, message, 16) <= 0)
         handle_error("[server] Eroare la trimiterea timpului catre participant.\n", errno);
 }
+///Trimitere indicatii
 void sendHelp(int clientSock)
 {
     int help_fd;
@@ -274,6 +286,7 @@ void sendHelp(int clientSock)
     printf("[server] Am transmis informatii de ajutor ramas catre participant.\n");
     fflush(stdout);
 }
+///Tratare login
 void login(int clientSock)
 {
     xmlDoc *doc = NULL;
@@ -307,6 +320,7 @@ void login(int clientSock)
     xmlFreeDoc(doc);
     xmlCleanupParser();
 }
+///Trimitere date problema
 void sendProblem(int clientSock)
 {
     xmlDoc *doc = NULL;
@@ -329,6 +343,7 @@ void sendProblem(int clientSock)
     xmlFreeDoc(doc);
     xmlCleanupParser();
 }
+///Primirea sursei
 void receiveSource(int clientSock, char* sourceName, char* execName, char* dirName)
 {
     struct stat dirStat;
@@ -382,6 +397,7 @@ void receiveSource(int clientSock, char* sourceName, char* execName, char* dirNa
     chdir("..");
     close(source_fd);
 }
+///Evaluarea sursei
 void evaluateSource(int clientSock, char* sourceName, char* execName, char* dirName)
 {
     struct stat st;
@@ -464,8 +480,10 @@ void evaluateSource(int clientSock, char* sourceName, char* execName, char* dirN
     printf("[server] Am transmis rezultatele.\n");
     fflush(stdout);
     chdir("..");
-}
 
+    removeDir(dirName);
+}
+///Gasirea utilizatorului in Participants.xml
 void findUser(xmlNode* root, char* searched, bool& found)
 {
     xmlNode* cur_node = NULL;
@@ -485,6 +503,7 @@ void findUser(xmlNode* root, char* searched, bool& found)
         findUser(cur_node->children, searched, found);
     }
 }
+///Construirea problemei din Problems.xml
 void buildProblem(char* statement, xmlNode* root)
 {
     xmlNode* cur_node = NULL, *section = NULL;
@@ -543,6 +562,7 @@ void buildProblem(char* statement, xmlNode* root)
     }
     strcat(statement, "______________________________\n");
 }
+///Obtinerea numelor fisierelor I/O din Problems.xml
 void getIO(char* file, char type)
 {
     xmlDoc *doc = NULL;
@@ -588,6 +608,7 @@ void getIO(char* file, char type)
     xmlFreeDoc(doc);
     xmlCleanupParser();
 }
+///Modificarea fisierelor I/O pentru testare
 void modifyInput(char* correct, char* inputFile, int idTest)
 {
     xmlDoc *doc = NULL;
@@ -641,4 +662,21 @@ void modifyInput(char* correct, char* inputFile, int idTest)
     xmlFreeDoc(doc);
     xmlCleanupParser();
     //close(inputFD);
+}
+///Stergerea directorului de evaluare
+void removeDir(char* dirName)
+{
+    pid_t child;
+
+    if(-1 == (child = fork()))
+        handle_error("[server] Eroare la stergerea directorului de evaluare.\n", errno);
+    if(child == 0)
+    {
+        if(-1 == execlp("rm", "rm", "-r", dirName, NULL))
+            handle_error("[server] Eroare la stergerea directorului de evaluare.\n", errno);
+    }
+    else
+    {
+        waitpid(child, NULL, 0);
+    }
 }

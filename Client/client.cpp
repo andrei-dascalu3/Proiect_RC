@@ -20,6 +20,7 @@ using namespace std;
 extern int errno;
 int port;
 
+///Functii
 void getCommand(int sockd);
 void getTime(int sockd);
 int login(int sockd);
@@ -55,6 +56,7 @@ int main (int argc, char *argv[])
 
     close(sd);
 }
+///Primirea comenzii
 void getCommand(int sockd)
 {
     int has_logged = 0, has_read = 0, has_sent = 0;
@@ -62,6 +64,7 @@ void getCommand(int sockd)
     while(1)
     {
         bzero(message, 5);
+        printf("______________________________\n");
         printf("Dati o comanda : ");
         cin.getline(command, 25);
         if(strchr(command, ' ') != NULL)
@@ -144,6 +147,7 @@ void getCommand(int sockd)
         }
     }
 }
+///Obtinerea timpului ramas
 void getTime(int sockd)
 {
     char message[16];
@@ -152,6 +156,7 @@ void getTime(int sockd)
     printf("Timp ramas: %s\n", message);
     fflush(stdout);
 }
+///Logarea la server
 int login(int sockd)
 {
     printf("Introduceti username : ");
@@ -173,6 +178,7 @@ int login(int sockd)
         return 0;
     return 1;
 }
+///Primirea enuntului problemei
 int readProblem(int sockd)
 {
     char statement[DIMBUF*2], msg[50];
@@ -184,6 +190,7 @@ int readProblem(int sockd)
     printf("%s", statement); fflush(stdout);
     return 1;
 }
+///Trimiterea sursei
 int sendSourceCode(int sockd)
 {
     char sourcename[40];
@@ -223,6 +230,7 @@ int sendSourceCode(int sockd)
     close(source_fd);
     return 1;
 }
+///Primirea rezultatelor
 void receiveResults(int sockd)
 {
     char buffer[DIMBUF];
@@ -232,6 +240,7 @@ void receiveResults(int sockd)
     printf("%s", buffer);
     fflush(stdout);
 }
+///Primire indicatii
 void getHelp(int sockd)
 {
     int readcode;
